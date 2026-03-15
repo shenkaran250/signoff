@@ -1309,3 +1309,46 @@
 </script>
 </body>
 </html>
+
+
+
+
+// added for github and firebase integration
+<script type="module">
+  // Import Firebase SDK from CDN
+  import { initializeApp } 
+    from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import { getFirestore, collection, addDoc, getDocs }
+    from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+  // Your Firebase configuration (paste YOUR values here)
+  const firebaseConfig = {
+  apiKey: "AIzaSyDNbYJ-YzYCsTPbLqq4L1MsMtZaBJD6pAU",
+  authDomain: "signoff-app.firebaseapp.com",
+  projectId: "signoff-app",
+  storageBucket: "signoff-app.firebasestorage.app",
+  messagingSenderId: "436328014747",
+  appId: "1:436328014747:web:6cb21f3474f8354754373e"
+};
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // Function to save data
+  window.saveResponse = async function (data) {
+    await addDoc(collection(db, "responses"), {
+      ...data,
+      createdAt: new Date().toISOString()
+    });
+    console.log("Saved:", data);
+  };
+
+  // Function to load all data
+  window.loadResponses = async function () {
+    const snap = await getDocs(collection(db, "responses"));
+    const results = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    console.log("Loaded:", results);
+    return results;
+  };
+</script>
