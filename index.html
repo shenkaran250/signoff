@@ -1,0 +1,1311 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UPHY Team Signoff Tracker</title>
+  <style>
+    :root{
+      --bg:#fff; --text:#111; --muted:#555; --line:#e8e8e8; --primary:#0b5fff;
+
+      --status-notdone:#ffd8a8;
+      --status-done:#b7eb8f;
+      --status-na:#ffffff;
+
+      --project-btn:#dbeafe;
+      --milestone-btn:#ffedd5;
+      --unit-btn:#dcfce7;
+
+      --project-glow: rgba(37, 99, 235, 0.28);
+      --milestone-glow: rgba(234, 88, 12, 0.22);
+      --unit-glow: rgba(22, 163, 74, 0.22);
+
+      --reset-btn:#fee2e2;
+      --reset-text:#444;
+
+      --badge-bg:#f3f4f6;
+      --badge-border:#e5e7eb;
+
+      /* Done% colors */
+      --pct-0:#6b7280;
+      --pct-1:#f97316;
+      --pct-25:#facc15;
+      --pct-50:#a3e635;
+      --pct-75:#4ade80;
+      --pct-100:#15803d;
+
+      --danger-bg:#fee2e2;
+      --danger-border:#fecaca;
+      --danger-text:#7f1d1d;
+    }
+
+    body{font-family:system-ui,Arial,sans-serif;margin:20px;color:var(--text);background:var(--bg);max-width:1100px;position:relative;}
+    #now{position:absolute;top:6px;right:8px;color:var(--muted);font-size:13px;text-align:right;white-space:nowrap;}
+
+    header{text-align:center;margin-bottom:12px;padding-top:10px;}
+    h1{margin:0;font-size:32px;}
+    .muted{color:var(--muted);font-size:13px;}
+
+    .panel{margin-top:12px;display:flex;justify-content:center;}
+
+    .bar{
+      width:min(980px,100%);
+      padding:10px;
+      border:1px solid var(--line);
+      border-radius:12px;
+      background:#fff;
+      position:relative;
+    }
+    .barHeader{
+      text-align:center;
+      font-size:13px;
+      color:var(--muted);
+      margin-bottom:8px;
+    }
+    .barButtons{
+      display:flex;
+      justify-content:center;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .btn{
+      border:1px solid rgba(0,0,0,0.08);
+      padding:8px 12px;border-radius:999px;cursor:pointer;font:inherit;font-weight:700;color:#111;
+      background:#f6f7f9;
+      transition: box-shadow .12s ease, border-color .12s ease;
+    }
+
+    /* per-bar color */
+    #projectButtons .btn{ background: var(--project-btn); }
+    #msButtons      .btn{ background: var(--milestone-btn); }
+    #unitButtons    .btn{ background: var(--unit-btn); }
+
+    /* per-bar active glow */
+    #projectButtons .btn.active{ border-color: rgba(37,99,235,0.35); box-shadow: 0 0 0 4px var(--project-glow); }
+    #msButtons      .btn.active{ border-color: rgba(234,88,12,0.30); box-shadow: 0 0 0 4px var(--milestone-glow); }
+    #unitButtons    .btn.active{ border-color: rgba(22,163,74,0.28); box-shadow: 0 0 0 4px var(--unit-glow); }
+
+    .barIconBtn{
+      position:absolute;
+      bottom: 10px;
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      border: 1px solid rgba(0,0,0,0.12);
+      background:#fff;
+      cursor:pointer;
+      font-weight: 900;
+      font-size: 14px;
+      line-height: 20px;
+      padding: 0 0 2px 0;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      text-align: center;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+      user-select:none;
+    }
+    .barIconBtn:hover{ background:#f8fafc; }
+    .barAddBtn{ right: 10px; }
+    .barDelBtn{
+      left: 10px;
+      background: var(--danger-bg);
+      border-color: var(--danger-border);
+      color: var(--danger-text);
+    }
+    .barDelBtn:hover{ background:#ffd7d7; }
+
+    .bar-btn-wrap{ position: relative; display: inline-block; }
+    .barDelBtnOnPill{
+      position: absolute;
+      bottom: -4px;
+      left: -4px;
+      width: 16px;   /* change for button size */
+      height: 16px;  /* change for button size */
+      border-radius: 999px;
+      border: 1px solid var(--danger-border);
+      background: var(--danger-bg);
+      color: var(--danger-text);
+      cursor: pointer;
+      font-weight: 900;
+      font-size: 14px;  /* change for × character size */
+      line-height: 16px;
+      padding: 0 0 1px 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+      user-select: none;
+    }
+    .barDelBtnOnPill:hover{ background:#ffd7d7; }
+    .bar-btn-wrap.active .barDelBtnOnPill{ display: inline-flex; }
+    .bar-btn-wrap[draggable="true"]{ cursor: grab; }
+    .bar-btn-wrap[draggable="true"]:active{ cursor: grabbing; }
+    .bar-btn-wrap.dragging{ opacity: 0.6; }
+    .bar-btn-wrap.drop-target{ box-shadow: 0 0 0 2px var(--primary); border-radius: 999px; }
+
+    .cardWrap{width:min(980px,100%);}
+    .card{border:1px solid var(--line);border-radius:12px;background:#fff;padding:12px; position:relative;}
+
+    table{width:100%;border-collapse:collapse;margin-top:10px;}
+    th,td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top;}
+    tr.no-line-below td{border-bottom:none;}
+    th{text-align:left;font-size:12px;color:#333;}
+    th.col-manager-owner{ width: 122px; }
+    td.stagename{font-weight:700;width:72px;white-space:nowrap;}
+
+    input[type="text"], textarea, select{
+      width:100%;box-sizing:border-box;font:inherit;border:1px solid #d6d6d6;border-radius:10px;padding:8px 10px;background:#fff;
+    }
+    textarea{min-height:62px;resize:vertical;}
+
+    .dueGroup{
+      display:flex; align-items:stretch;
+      border:1px solid #d6d6d6;
+      border-radius:10px;
+      overflow:hidden;
+      background:#fff;
+    }
+    .dueGroup select{
+      border:0 !important;
+      border-radius:0 !important;
+      padding:6px 20px 6px 6px;
+      background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%23555' d='M2 4l3 3 3-3H2z'/%3E%3C/svg%3E") no-repeat right 5px center;
+      background-size: 10px;
+      min-width: 0;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    .dueGroup select:not(:last-child){
+      border-right:1px solid #e0e0e0 !important;
+    }
+    .dueGroup select[data-part="day"]{ width: 3.5em; min-width: 3.5em; }
+    .dueGroup select[data-part="month"]{ width: 5em; min-width: 5em; }
+    .dueGroup select[data-part="year"]{ width: 4.2em; min-width: 4.2em; }
+
+    .actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-top:10px;}
+    .actionsLeft{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+
+    .primary{background:var(--primary);color:#fff;border:1px solid var(--primary);padding:10px 12px;border-radius:10px;cursor:pointer;font:inherit;font-weight:700;}
+    .ghost{background:#fff;color:var(--text);border:1px solid var(--line);padding:10px 12px;border-radius:10px;cursor:pointer;font:inherit;font-weight:700;}
+    .reset{ background: var(--reset-btn); border: 1px solid #fecaca; color: var(--reset-text); }
+
+    .badge{
+      display:inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--badge-border);
+      font-size: 12px;
+      color: #444;
+      background: var(--badge-bg);
+      font-weight: 800;
+    }
+
+    .hint{margin-top:8px;font-style:italic;}
+
+    .statusCell{font-weight:700;}
+    select.status{font-weight:700; width:100%; box-sizing:border-box; }
+    select.status.notdone{background:var(--status-notdone);}
+    select.status.done{background:var(--status-done);}
+    select.status.na{background:var(--status-na);}
+
+    .pctPill{
+      display:inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background:#fff;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .pct0{ color: var(--pct-0); }
+    .pct1{ color: var(--pct-1); }
+    .pct25{ color: var(--pct-25); }
+    .pct50{ color: var(--pct-50); }
+    .pct75{ color: var(--pct-75); }
+    .pct100{ color: var(--pct-100); font-weight: 900; }
+
+    .rowActions{ white-space: nowrap; text-align: right; }
+    .stageDelBtn{
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      border: 1px solid var(--danger-border);
+      background: var(--danger-bg);
+      color: var(--danger-text);
+      cursor: pointer;
+      font: inherit;
+      font-weight: 900;
+      font-size: 14px;
+      line-height: 20px;
+      padding: 0 0 2px 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+      user-select: none;
+    }
+    .stageDelBtn:hover{ background:#ffd7d7; }
+    .stageAddBtn{
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      border: 1px solid #93c5fd;
+      background: #dbeafe;
+      color: #1e40af;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 900;
+      font-size: 14px;
+      line-height: 20px;
+      padding: 0 0 2px 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+      user-select: none;
+    }
+    .stageAddBtn:hover{ background: #bfdbfe; }
+    .rowActions .stageDelBtn,
+    .rowActions .stageAddBtn{ margin-left: 4px; }
+    .rowActions .stageAddBtn:first-of-type{ margin-left: 0; }
+
+    .fab{
+      position:absolute;
+      right: 14px;
+      bottom: 14px;
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      border: 1px solid rgba(0,0,0,0.10);
+      background: #fff;
+      cursor: pointer;
+      font-weight: 900;
+      font-size: 18px;
+      line-height: 34px;
+      padding: 0 0 3px 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.10);
+      user-select:none;
+    }
+    .fab:hover{ background:#f8fafc; }
+
+    .addPanel{
+      position:absolute;
+      right: 14px;
+      bottom: 56px;
+      width: min(360px, calc(100% - 28px));
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+      padding: 10px;
+      box-shadow: 0 10px 26px rgba(0,0,0,0.10);
+      display:none;
+    }
+    .addPanel .row{ display:flex; gap:8px; align-items:center; }
+    .addPanel input{ flex:1; }
+    .addPanel .small{
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background:#fff;
+      cursor:pointer;
+      font-weight:700;
+    }
+    .addPanel .small.primary{
+      background: var(--primary);
+      color:#fff;
+      border-color: var(--primary);
+    }
+    .addPanel .title{ font-size: 12px; color: #333; font-weight: 800; margin-bottom: 8px; }
+    .addPanel .err{ margin-top: 8px; color:#b91c1c; font-size: 12px; display:none; }
+
+    #adminBar{ display: none; margin-bottom: 10px; padding: 8px 12px; background: var(--line); border-radius: 8px; font-size: 12px; }
+    body.show-admin #adminBar{ display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    #adminBar .admin-btn{ padding: 6px 10px; border-radius: 6px; border: 1px solid #ccc; background: #fff; cursor: pointer; font-size: 12px; font-weight: 700; }
+    #adminBar .admin-btn:hover{ background: #f0f0f0; }
+    #adminBar input[type="file"]{ display: none; }
+
+    .deleteConfirmOverlay{
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.35);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    .deleteConfirmOverlay.show{ display: flex; }
+    .deleteConfirmDialog{
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 20px;
+      max-width: 420px;
+      box-shadow: 0 12px 28px rgba(0,0,0,0.15);
+    }
+    .deleteConfirmDialog .dcMessage{ white-space: pre-line; margin-bottom: 16px; }
+    .deleteConfirmDialog .dcButtons{ display: flex; gap: 10px; justify-content: flex-end; }
+    .deleteConfirmDialog .dcBtnCancel{ padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); background: #fff; cursor: pointer; font-weight: 700; }
+    .deleteConfirmDialog .dcBtnDelete{ padding: 8px 14px; border-radius: 8px; border: 1px solid var(--danger-border); background: var(--danger-bg); color: var(--danger-text); cursor: pointer; font-weight: 700; }
+
+    @media (max-width: 900px){
+      td.stagename{width:auto;}
+      .dueGroup select[data-part="day"],
+      .dueGroup select[data-part="month"],
+      .dueGroup select[data-part="year"]{ width: 100%; min-width: 0; }
+      .dueGroup{flex-direction:column;}
+      .dueGroup select:not(:last-child){border-right:0 !important;border-bottom:1px solid #e0e0e0 !important;}
+      #now{position:static;display:block;margin-bottom:8px;text-align:center;}
+      .fab{ right: 10px; bottom: 10px; }
+      .addPanel{ right: 10px; bottom: 52px; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="now"></div>
+
+<div id="adminBar" aria-label="Admin options">
+  <button type="button" class="admin-btn" id="adminExportBtn">Export JSON</button>
+  <button type="button" class="admin-btn" id="adminImportBtn">Import JSON</button>
+  <input type="file" id="adminFileInput" accept=".json,application/json" />
+</div>
+
+<div id="deleteConfirmOverlay" class="deleteConfirmOverlay" aria-modal="true" aria-labelledby="deleteConfirmMessage" role="dialog">
+  <div class="deleteConfirmDialog">
+    <div id="deleteConfirmMessage" class="dcMessage"></div>
+    <div class="dcButtons">
+      <button type="button" class="dcBtnCancel" id="deleteConfirmCancel">Cancel</button>
+      <button type="button" class="dcBtnDelete" id="deleteConfirmYes">Yes, DELETE</button>
+    </div>
+  </div>
+</div>
+
+<header>
+  <h1>UPHY Team Signoff Tracker</h1>
+  <div class="muted">Select Project → Milestone → Unit</div>
+</header>
+
+<div class="panel">
+  <div class="bar">
+    <div class="barHeader">Project</div>
+    <div class="barButtons" id="projectButtons"></div>
+    <button class="barIconBtn barAddBtn" id="addProjectBtn" type="button" aria-label="Add project">+</button>
+  </div>
+</div>
+
+<div class="panel" id="msPanel" style="display:none;">
+  <div class="bar">
+    <div class="barHeader">Milestone</div>
+    <div class="barButtons" id="msButtons"></div>
+    <button class="barIconBtn barAddBtn" id="addMilestoneBtn" type="button" aria-label="Add milestone">+</button>
+  </div>
+</div>
+
+<div class="panel" id="unitPanel" style="display:none;">
+  <div class="bar">
+    <div class="barHeader">Unit</div>
+    <div class="barButtons" id="unitButtons"></div>
+    <button class="barIconBtn barAddBtn" id="addUnitBtn" type="button" aria-label="Add unit">+</button>
+  </div>
+</div>
+
+<div class="panel" id="formPanel" style="display:none;">
+  <div class="cardWrap">
+    <div class="card">
+      <div class="actions">
+        <div class="actionsLeft">
+          <span class="badge" id="selectionBadge">—</span>
+          <span class="pctPill pct0" id="unitPct" style="display:none;">Done: —</span>
+          <span class="muted" id="saveState">Last update: —</span>
+        </div>
+        <div class="actionsLeft">
+          <button class="ghost reset" id="resetBtn" type="button">Reset All</button>
+          <button class="primary" id="saveBtn" type="button">Save</button>
+        </div>
+      </div>
+
+      <table aria-label="Signoff table">
+        <thead>
+          <tr>
+            <th style="width:72px;">Stage</th>
+            <th class="col-manager-owner">Manager</th>
+            <th class="col-manager-owner">Owner</th>
+            <th style="width:150px;">Due Date</th>
+            <th>Comments</th>
+            <th class="statusCell" style="width:116px;">Status</th>
+            <th style="width:36px;"></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+
+      <div class="muted hint">
+        *Don't forget to save changes before exiting this window.
+      </div>
+
+      <div class="addPanel" id="addPanel" aria-label="Add stage panel">
+        <div class="title">Add Stage</div>
+        <div class="row">
+          <input id="newStageName" type="text" placeholder="Stage name (e.g., DV, PV, RV...)" />
+          <button class="small primary" id="addStageBtn" type="button">Add</button>
+          <button class="small" id="cancelAddStageBtn" type="button">Cancel</button>
+        </div>
+        <div class="err" id="addStageErr">Please enter a unique Stage name.</div>
+      </div>
+      <button class="fab" id="fabAddStage" type="button" aria-label="Add stage">+</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const DEFAULT_STAGES = [];
+  const DEFAULT_PROJECTS = [];
+  const DEFAULT_MILESTONES = [];
+  const DEFAULT_UNITS = [];
+  const STATUSES = ["Not Done", "Done", "N/A"];
+
+  const YEARS = [2026, 2027, 2028, 2029, 2030];
+  const MONTHS = [
+    ["01","Jan"],["02","Feb"],["03","Mar"],["04","Apr"],["05","May"],["06","Jun"],
+    ["07","Jul"],["08","Aug"],["09","Sep"],["10","Oct"],["11","Nov"],["12","Dec"]
+  ];
+  const DAYS = Array.from({length:31},(_,i)=>String(i+1).padStart(2,"0"));
+
+  let selectedProject = null;
+  let selectedMs = null;
+  let selectedUnit = null;
+  let isDirty = false;
+
+  const $ = (id) => document.getElementById(id);
+  $("now").textContent = new Date().toLocaleString();
+
+  const STORAGE_PREFIX = "signoff-tracker-v14";
+  const STORAGE_STRUCTURE = `${STORAGE_PREFIX}::structure`;
+
+  function storageKeyData(p=selectedProject,m=selectedMs,u=selectedUnit){ return `${STORAGE_PREFIX}::data::${p}::${m}::${u}`; }
+  function storageKeyMeta(p=selectedProject,m=selectedMs,u=selectedUnit){ return `${STORAGE_PREFIX}::meta::${p}::${m}::${u}`; }
+
+  function emptyRow(){ return { manager:"", owner:"", due:{day:"",month:"",year:""}, status:"Not Done", comments:"" }; }
+  function normalizeRow(r){
+    return {
+      manager: r.manager ?? "",
+      owner: r.owner ?? "",
+      due: { day: r.due?.day ?? "", month: r.due?.month ?? "", year: r.due?.year ?? "" },
+      status: r.status ?? "Not Done",
+      comments: r.comments ?? ""
+    };
+  }
+  function emptyModel(){
+    const model = { stages: [...DEFAULT_STAGES], rows: {} };
+    for (const s of model.stages) model.rows[s] = [ emptyRow() ];
+    return model;
+  }
+  function normalizeModel(parsed){
+    const base = emptyModel();
+    const stages = Array.isArray(parsed?.stages) ? parsed.stages : DEFAULT_STAGES;
+    base.stages = [...new Set(stages.map(s => String(s).trim()).filter(Boolean))];
+    base.rows = {};
+    for (const s of base.stages){
+      const raw = parsed?.rows?.[s];
+      if (Array.isArray(raw)){
+        base.rows[s] = raw.map(r => normalizeRow(r));
+        if (base.rows[s].length === 0) base.rows[s] = [ emptyRow() ];
+      } else if (raw && typeof raw === "object" && !Array.isArray(raw)){
+        base.rows[s] = [ normalizeRow(raw) ];
+      } else {
+        base.rows[s] = [ emptyRow() ];
+      }
+    }
+    return base;
+  }
+  function loadModel(p=selectedProject,m=selectedMs,u=selectedUnit){
+    const raw = localStorage.getItem(storageKeyData(p,m,u));
+    if (!raw) return emptyModel();
+    try{ return normalizeModel(JSON.parse(raw)); }
+    catch{ return emptyModel(); }
+  }
+
+  function loadMeta(p=selectedProject,m=selectedMs,u=selectedUnit){
+    const raw = localStorage.getItem(storageKeyMeta(p,m,u));
+    if (!raw) return { lastSavedAt: null };
+    try{
+      const mm = JSON.parse(raw);
+      return { lastSavedAt: (typeof mm.lastSavedAt === "number" ? mm.lastSavedAt : null) };
+    } catch { return { lastSavedAt: null }; }
+  }
+  function saveMeta(lastSavedAt,p=selectedProject,m=selectedMs,u=selectedUnit){
+    localStorage.setItem(storageKeyMeta(p,m,u), JSON.stringify({ lastSavedAt }));
+  }
+  function updateLastUpdateLabelFromMeta(){
+    const meta = loadMeta();
+    $("saveState").textContent = meta.lastSavedAt
+      ? ("Last update: " + new Date(meta.lastSavedAt).toLocaleString())
+      : "Last update: —";
+  }
+  function saveModel(model){
+    localStorage.setItem(storageKeyData(), JSON.stringify(model));
+    const ts = Date.now();
+    saveMeta(ts);
+    updateLastUpdateLabelFromMeta();
+    markClean();
+  }
+
+  function markDirty(){
+    isDirty = true;
+    $("saveState").textContent = "Unsaved changes";
+  }
+  function markClean(){ isDirty = false; }
+
+  function confirmProceedIfDirty(){
+    if (!isDirty) return true;
+    return confirm("You have unsaved changes. Please click Save before leaving.\n\nContinue without saving?");
+  }
+  function confirmDelete(message, onConfirm){
+    const overlay = $("deleteConfirmOverlay");
+    const msgEl = $("deleteConfirmMessage");
+    msgEl.textContent = message;
+    overlay.classList.add("show");
+    const doClose = ()=>{ overlay.classList.remove("show"); };
+    const cancelBtn = $("deleteConfirmCancel");
+    const yesBtn = $("deleteConfirmYes");
+    const handleYes = ()=>{
+      yesBtn.removeEventListener("click", handleYes);
+      cancelBtn.removeEventListener("click", handleCancel);
+      overlay.removeEventListener("click", handleOverlayClick);
+      doClose();
+      onConfirm();
+    };
+    const handleCancel = ()=>{ cancelBtn.removeEventListener("click", handleCancel); yesBtn.removeEventListener("click", handleYes); overlay.removeEventListener("click", handleOverlayClick); doClose(); };
+    const handleOverlayClick = (e)=>{ if (e.target === overlay) handleCancel(); };
+    yesBtn.addEventListener("click", handleYes);
+    cancelBtn.addEventListener("click", handleCancel);
+    overlay.addEventListener("click", handleOverlayClick);
+  }
+  window.addEventListener("beforeunload", (e) => {
+    if (!isDirty) return;
+    e.preventDefault();
+    e.returnValue = "";
+  });
+
+  // Structure: { projects: [], milestonesByProject: {p:[]}, unitsByProject:{p:[]} }
+  function defaultStructure(){
+    const milestonesByProject = {};
+    const unitsByProject = {};
+    for (const p of DEFAULT_PROJECTS){
+      milestonesByProject[p] = [...DEFAULT_MILESTONES];
+      unitsByProject[p] = [...DEFAULT_UNITS];
+    }
+    return { projects: [...DEFAULT_PROJECTS], milestonesByProject, unitsByProject };
+  }
+  function loadStructure(){
+    const raw = localStorage.getItem(STORAGE_STRUCTURE);
+    if (!raw) return defaultStructure();
+    try{
+      const s = JSON.parse(raw);
+      const out = { projects: [], milestonesByProject: {}, unitsByProject: {} };
+
+      out.projects = Array.isArray(s.projects) ? [...new Set(s.projects.map(x=>String(x).trim()).filter(Boolean))] : [...DEFAULT_PROJECTS];
+      out.milestonesByProject = (s.milestonesByProject && typeof s.milestonesByProject === "object") ? s.milestonesByProject : {};
+      out.unitsByProject = (s.unitsByProject && typeof s.unitsByProject === "object") ? s.unitsByProject : {};
+
+      for (const p of out.projects){
+        const ms = out.milestonesByProject[p];
+        out.milestonesByProject[p] = Array.isArray(ms) ? [...new Set(ms.map(x=>String(x).trim()).filter(Boolean))] : [];
+        const u = out.unitsByProject[p];
+        out.unitsByProject[p] = Array.isArray(u) ? [...new Set(u.map(x=>String(x).trim()).filter(Boolean))] : [];
+      }
+      return out;
+    } catch {
+      return defaultStructure();
+    }
+  }
+  function saveStructure(structure){ localStorage.setItem(STORAGE_STRUCTURE, JSON.stringify(structure)); }
+  function milestonesForProject(structure, project){ return structure.milestonesByProject[project] || []; }
+  function unitsForProject(structure, project){ return structure.unitsByProject[project] || []; }
+
+  function buildBar(containerEl, items, onPick, onDelete, onReorder){
+    containerEl.innerHTML = "";
+    for (const name of items){
+      const wrap = document.createElement("div");
+      wrap.className = "bar-btn-wrap";
+      wrap.dataset.name = name;
+      if (typeof onReorder === "function"){
+        wrap.setAttribute("draggable", "true");
+        wrap.setAttribute("aria-label", "Drag to reorder");
+        wrap.addEventListener("dragstart", (e)=>{
+          e.dataTransfer.setData("text/plain", name);
+          e.dataTransfer.effectAllowed = "move";
+          wrap.classList.add("dragging");
+        });
+        wrap.addEventListener("dragend", ()=>{ wrap.classList.remove("dragging"); });
+        wrap.addEventListener("dragover", (e)=>{
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          containerEl.querySelectorAll(".bar-btn-wrap").forEach(w=> w.classList.remove("drop-target"));
+          wrap.classList.add("drop-target");
+        });
+        wrap.addEventListener("drop", (e)=>{
+          e.preventDefault();
+          wrap.classList.remove("drop-target");
+          const draggedName = e.dataTransfer.getData("text/plain");
+          if (draggedName === name) return;
+          const wraps = Array.from(containerEl.querySelectorAll(".bar-btn-wrap"));
+          const currentOrder = wraps.map(w=> w.dataset.name);
+          const fromIndex = currentOrder.indexOf(draggedName);
+          const toIndex = currentOrder.indexOf(name);
+          const newOrder = currentOrder.filter(n=> n !== draggedName);
+          const dropTargetIndexInNewOrder = newOrder.indexOf(name);
+          if (fromIndex < toIndex) {
+            newOrder.splice(dropTargetIndexInNewOrder + 1, 0, draggedName);
+          } else {
+            newOrder.splice(dropTargetIndexInNewOrder, 0, draggedName);
+          }
+          onReorder(newOrder);
+        });
+        wrap.addEventListener("dragleave", ()=>{ wrap.classList.remove("drop-target"); });
+      }
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn";
+      btn.textContent = name;
+      btn.addEventListener("click", ()=>onPick(name));
+      wrap.appendChild(btn);
+      if (typeof onDelete === "function"){
+        const delBtn = document.createElement("button");
+        delBtn.type = "button";
+        delBtn.className = "barDelBtnOnPill";
+        delBtn.setAttribute("aria-label", "Delete");
+        delBtn.textContent = "×";
+        delBtn.addEventListener("click", (e)=>{ e.preventDefault(); e.stopPropagation(); onDelete(); });
+        wrap.appendChild(delBtn);
+      }
+      containerEl.appendChild(wrap);
+    }
+  }
+  function reorderProjects(newOrder){
+    const structure = loadStructure();
+    structure.projects = newOrder;
+    saveStructure(structure);
+    buildBar($("projectButtons"), structure.projects, onPickProject, ()=>delProject(), reorderProjects);
+    setActive($("projectButtons"), selectedProject);
+  }
+  function reorderMilestones(newOrder){
+    if (!selectedProject) return;
+    const structure = loadStructure();
+    structure.milestonesByProject[selectedProject] = newOrder;
+    saveStructure(structure);
+    buildBar($("msButtons"), structure.milestonesByProject[selectedProject], onPickMilestone, ()=>delMilestone(), reorderMilestones);
+    setActive($("msButtons"), selectedMs);
+  }
+  function reorderUnits(newOrder){
+    if (!selectedProject) return;
+    const structure = loadStructure();
+    structure.unitsByProject[selectedProject] = newOrder;
+    saveStructure(structure);
+    buildBar($("unitButtons"), structure.unitsByProject[selectedProject], onPickUnit, ()=>delUnit(), reorderUnits);
+    setActive($("unitButtons"), selectedUnit);
+  }
+  function setActive(containerEl, value){
+    containerEl.querySelectorAll(".bar-btn-wrap").forEach(wrap=>{
+      const btn = wrap.querySelector("button.btn");
+      const active = btn && btn.textContent === value;
+      if (btn) btn.classList.toggle("active", active);
+      wrap.classList.toggle("active", active);
+    });
+  }
+  function updateBadge(){
+    $("selectionBadge").textContent = `${selectedProject} / ${selectedMs} / ${selectedUnit}`;
+  }
+
+  function escapeText(s=""){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+  function escapeAttr(s=""){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function optionHtml(value,label,selectedValue){
+    const sel = (value === selectedValue) ? "selected" : "";
+    return `<option value="${escapeAttr(value)}" ${sel}>${escapeText(label ?? value)}</option>`;
+  }
+  function statusClass(status){
+    if (status === "Done") return "done";
+    if (status === "N/A") return "na";
+    return "notdone";
+  }
+
+  function renderTable(model){
+    const tbody = $("tbody");
+    tbody.innerHTML = "";
+
+    for (const stage of model.stages){
+      const stageRows = Array.isArray(model.rows[stage]) ? model.rows[stage] : [ emptyRow() ];
+      for (let rowIndex = 0; rowIndex < stageRows.length; rowIndex++){
+        const row = stageRows[rowIndex];
+        const tr = document.createElement("tr");
+        tr.dataset.stage = stage;
+        tr.dataset.rowIndex = String(rowIndex);
+        if (rowIndex < stageRows.length - 1) tr.classList.add("no-line-below");
+
+        const tdStage = document.createElement("td");
+        tdStage.className = "stagename";
+        tdStage.textContent = rowIndex === 0 ? stage : "";
+
+        const tdManager = document.createElement("td");
+        tdManager.innerHTML = `<input type="text" data-stage="${escapeAttr(stage)}" data-row-index="${rowIndex}" data-field="manager" value="${escapeAttr(row.manager)}" />`;
+
+        const tdOwner = document.createElement("td");
+        tdOwner.innerHTML = `<input type="text" data-stage="${escapeAttr(stage)}" data-row-index="${rowIndex}" data-field="owner" value="${escapeAttr(row.owner)}" />`;
+
+        const tdDue = document.createElement("td");
+        tdDue.innerHTML = `
+          <div class="dueGroup">
+            <select data-part="day" data-stage="${escapeAttr(stage)}" data-row-index="${rowIndex}" data-field="due.day">
+              ${optionHtml("", "Day", row.due.day)}
+              ${DAYS.map(d=>optionHtml(d,d,row.due.day)).join("")}
+            </select>
+            <select data-part="month" data-stage="${escapeAttr(stage)}" data-row-index="${rowIndex}" data-field="due.month">
+              ${optionHtml("", "Month", row.due.month)}
+              ${MONTHS.map(([mm,label])=>optionHtml(mm,label,row.due.month)).join("")}
+            </select>
+            <select data-part="year" data-stage="${escapeAttr(stage)}" data-row-index="${rowIndex}" data-field="due.year">
+              ${optionHtml("", "Year", row.due.year)}
+              ${YEARS.map(y=>optionHtml(String(y),String(y),row.due.year)).join("")}
+            </select>
+          </div>
+        `;
+
+        const tdComments = document.createElement("td");
+        tdComments.innerHTML = `<textarea data-stage="${escapeAttr(stage)}" data-row-index="${rowIndex}" data-field="comments">${escapeText(row.comments)}</textarea>`;
+
+        const tdStatus = document.createElement("td");
+        tdStatus.className = "statusCell";
+        tdStatus.innerHTML = `
+          <select class="status ${statusClass(row.status)}" data-stage="${escapeAttr(stage)}" data-row-index="${rowIndex}" data-field="status">
+            ${STATUSES.map(s=>optionHtml(s,s,row.status)).join("")}
+          </select>
+        `;
+
+        const tdActions = document.createElement("td");
+        tdActions.className = "rowActions";
+        tdActions.innerHTML = `<button class="stageDelBtn" type="button" data-action="del-row" data-stage="${escapeAttr(stage)}" data-row-index="${rowIndex}" aria-label="Remove row">−</button><button class="stageAddBtn" type="button" data-action="add-row" data-stage="${escapeAttr(stage)}" data-row-index="${rowIndex}" aria-label="Add row below">+</button>`;
+
+        tr.append(tdStage, tdManager, tdOwner, tdDue, tdComments, tdStatus, tdActions);
+        tbody.appendChild(tr);
+      }
+    }
+
+    tbody.querySelectorAll("input, select, textarea").forEach(el=>{
+      el.addEventListener("input", () => { markDirty(); updateUnitPercentDebounced(); });
+      el.addEventListener("change", (e)=>{
+        markDirty();
+        const t = e.target;
+        if (t.matches("select.status")){
+          t.classList.remove("notdone","done","na");
+          t.classList.add(statusClass(t.value));
+        }
+        updateUnitPercentDebounced();
+      });
+    });
+
+    tbody.querySelectorAll("button[data-action='del-row']").forEach(btn=>{
+      btn.addEventListener("click", () => {
+        const stage = btn.dataset.stage;
+        const rowIndex = parseInt(btn.dataset.rowIndex, 10);
+        if (stage == null || isNaN(rowIndex)) return;
+
+        const modelNow = readModelFromUI();
+        const arr = modelNow.rows[stage];
+        if (!Array.isArray(arr) || rowIndex < 0 || rowIndex >= arr.length) return;
+        arr.splice(rowIndex, 1);
+        if (arr.length === 0){
+          modelNow.stages = (modelNow.stages || []).filter(s => s !== stage);
+          delete modelNow.rows[stage];
+        }
+        renderTable(modelNow);
+        markDirty();
+        updateUnitPercent();
+      });
+    });
+
+    tbody.querySelectorAll("button[data-action='add-row']").forEach(btn=>{
+      btn.addEventListener("click", () => {
+        const stage = btn.dataset.stage;
+        const rowIndex = parseInt(btn.dataset.rowIndex, 10);
+        if (stage == null || isNaN(rowIndex)) return;
+
+        const modelNow = readModelFromUI();
+        if (!modelNow.rows[stage]) modelNow.rows[stage] = [ emptyRow() ];
+        const arr = modelNow.rows[stage];
+        arr.splice(rowIndex + 1, 0, emptyRow());
+        renderTable(modelNow);
+        markDirty();
+        updateUnitPercent();
+      });
+    });
+  }
+
+  function stagesFromTable(){
+    const seen = new Set();
+    const order = [];
+    document.querySelectorAll("#tbody tr[data-stage]").forEach(tr=>{
+      const s = tr.dataset.stage;
+      if (s && !seen.has(s)){ seen.add(s); order.push(s); }
+    });
+    return order;
+  }
+
+  function readModelFromUI(){
+    const model = { stages: [], rows: {} };
+    const tbody = $("tbody");
+    const trs = tbody.querySelectorAll("tr[data-stage]");
+    trs.forEach(tr=>{
+      const stage = tr.dataset.stage;
+      if (!stage) return;
+      if (!model.rows[stage]){ model.stages.push(stage); model.rows[stage] = []; }
+      const rowData = emptyRow();
+      tr.querySelectorAll("input, select, textarea").forEach(el=>{
+        const field = el.dataset.field;
+        if (!field) return;
+        const val = el.value;
+        if (field === "manager") rowData.manager = val;
+        else if (field === "owner") rowData.owner = val;
+        else if (field === "status") rowData.status = val;
+        else if (field === "comments") rowData.comments = val;
+        else if (field === "due.day") rowData.due.day = val;
+        else if (field === "due.month") rowData.due.month = val;
+        else if (field === "due.year") rowData.due.year = val;
+      });
+      model.rows[stage].push(rowData);
+    });
+    return model;
+  }
+
+  function loadAndShowForm(){
+    $("formPanel").style.display = "";
+    updateBadge();
+
+    const model = loadModel();
+    renderTable(model);
+
+    updateLastUpdateLabelFromMeta();
+    markClean();
+
+    closeAddStagePanel();
+    updateUnitPercent();
+  }
+
+  // ---- Done% ----
+  function doneCountsForModel(model){
+    let done = 0, total = 0;
+    for (const s of model.stages || []){
+      const arr = model.rows?.[s];
+      if (!Array.isArray(arr)) continue;
+      for (const row of arr){
+        const st = row.status ?? "Not Done";
+        if (st === "N/A") continue;
+        total += 1;
+        if (st === "Done") done += 1;
+      }
+    }
+    return {done, total};
+  }
+  function percentClass(pct){
+    if (pct === 100) return "pct100";
+    if (pct >= 75) return "pct75";
+    if (pct >= 50) return "pct50";
+    if (pct >= 25) return "pct25";
+    if (pct >= 1) return "pct1";
+    return "pct0";
+  }
+  function setPct(el, pct){
+    const cls = percentClass(pct);
+    el.classList.remove("pct0","pct1","pct25","pct50","pct75","pct100");
+    el.classList.add("pctPill", cls);
+    el.textContent = `Done: ${pct}%`;
+  }
+  function computeUnitPctFromCurrentUI(){
+    if ($("formPanel").style.display !== "none" && selectedProject && selectedMs && selectedUnit){
+      const model = readModelFromUI();
+      const c = doneCountsForModel(model);
+      if (c.total === 0) return 0;
+      return Math.round((c.done/c.total)*100);
+    }
+    if (selectedProject && selectedMs && selectedUnit){
+      const model = loadModel(selectedProject, selectedMs, selectedUnit);
+      const c = doneCountsForModel(model);
+      if (c.total === 0) return 0;
+      return Math.round((c.done/c.total)*100);
+    }
+    return 0;
+  }
+  function updateUnitPercent(){
+    if (selectedProject && selectedMs && selectedUnit && $("formPanel").style.display !== "none"){
+      $("unitPct").style.display = "";
+      setPct($("unitPct"), computeUnitPctFromCurrentUI());
+    } else {
+      $("unitPct").style.display = "none";
+    }
+  }
+  let pctTimer = null;
+  function updateUnitPercentDebounced(){
+    clearTimeout(pctTimer);
+    pctTimer = setTimeout(updateUnitPercent, 150);
+  }
+
+  // ----- Add stage panel -----
+  function openAddStagePanel(){
+    $("addStageErr").style.display = "none";
+    $("addPanel").style.display = "block";
+    $("newStageName").value = "";
+    $("newStageName").focus();
+  }
+  function closeAddStagePanel(){
+    $("addPanel").style.display = "none";
+    $("addStageErr").style.display = "none";
+  }
+  function toggleAddStagePanel(){
+    if ($("addPanel").style.display === "block") closeAddStagePanel();
+    else openAddStagePanel();
+  }
+  function addStage(stageName){
+    const name = String(stageName || "").trim();
+    if (!name) return false;
+
+    const model = readModelFromUI();
+    const existing = new Set((model.stages || []).map(s => s.toLowerCase()));
+    if (existing.has(name.toLowerCase())) return false;
+
+    model.stages.push(name);
+    model.rows[name] = [ emptyRow() ];
+
+    renderTable(model);
+    markDirty();
+    closeAddStagePanel();
+    updateUnitPercent();
+    return true;
+  }
+
+  $("fabAddStage").addEventListener("click", (e)=>{
+    e.preventDefault();
+    if ($("formPanel").style.display === "none" || !selectedProject || !selectedMs || !selectedUnit) return;
+    toggleAddStagePanel();
+  });
+  $("cancelAddStageBtn").addEventListener("click", (e)=>{ e.preventDefault(); closeAddStagePanel(); });
+  $("addStageBtn").addEventListener("click", (e)=>{
+    e.preventDefault();
+    const ok = addStage($("newStageName").value);
+    $("addStageErr").style.display = ok ? "none" : "block";
+  });
+  $("newStageName").addEventListener("keydown", (e)=>{
+    if (e.key === "Enter"){ e.preventDefault(); $("addStageBtn").click(); }
+    else if (e.key === "Escape"){ e.preventDefault(); closeAddStagePanel(); }
+  });
+
+  // ----- Add/Delete Project/Milestone/Unit -----
+  function promptForName(kind){
+    const name = prompt(`New ${kind} name:`);
+    if (name === null) return null;
+    const trimmed = name.trim();
+    return trimmed ? trimmed : null;
+  }
+
+  function addProject(){
+    if (!confirmProceedIfDirty()) return;
+
+    const structure = loadStructure();
+    const name = promptForName("Project");
+    if (!name) return;
+
+    if (structure.projects.map(p=>p.toLowerCase()).includes(name.toLowerCase())){
+      alert("Project already exists.");
+      return;
+    }
+
+    structure.projects.push(name);
+    structure.milestonesByProject[name] = [];
+    structure.unitsByProject[name] = [];
+    saveStructure(structure);
+
+    buildBar($("projectButtons"), structure.projects, onPickProject, ()=>delProject(), reorderProjects);
+    selectedProject = name;
+    setActive($("projectButtons"), name);
+
+    selectedMs = null; selectedUnit = null;
+    $("msPanel").style.display = "";
+    $("unitPanel").style.display = "none";
+    $("formPanel").style.display = "none";
+    $("unitPct").style.display = "none";
+    markClean();
+    closeAddStagePanel();
+
+    buildBar($("msButtons"), [], onPickMilestone, ()=>delMilestone(), reorderMilestones);
+  }
+
+  function addMilestone(){
+    if (!selectedProject){ alert("Select a Project first."); return; }
+    if (!confirmProceedIfDirty()) return;
+
+    const structure = loadStructure();
+    const name = promptForName("Milestone");
+    if (!name) return;
+
+    const msList = milestonesForProject(structure, selectedProject);
+    if (msList.map(m=>m.toLowerCase()).includes(name.toLowerCase())){
+      alert("Milestone already exists for this Project.");
+      return;
+    }
+
+    structure.milestonesByProject[selectedProject] = [...msList, name];
+    saveStructure(structure);
+
+    buildBar($("msButtons"), structure.milestonesByProject[selectedProject], onPickMilestone, ()=>delMilestone(), reorderMilestones);
+    selectedMs = name;
+    setActive($("msButtons"), name);
+
+    selectedUnit = null;
+    $("unitPanel").style.display = "";
+    $("formPanel").style.display = "none";
+    $("unitPct").style.display = "none";
+    markClean();
+    closeAddStagePanel();
+
+    buildBar($("unitButtons"), unitsForProject(structure, selectedProject), onPickUnit, ()=>delUnit(), reorderUnits);
+  }
+
+  function addUnit(){
+    if (!selectedProject){ alert("Select a Project first."); return; }
+    if (!confirmProceedIfDirty()) return;
+
+    const structure = loadStructure();
+    const name = promptForName("Unit");
+    if (!name) return;
+
+    const unitList = unitsForProject(structure, selectedProject);
+    if (unitList.map(u=>u.toLowerCase()).includes(name.toLowerCase())){
+      alert("Unit already exists for this Project.");
+      return;
+    }
+
+    structure.unitsByProject[selectedProject] = [...unitList, name];
+    saveStructure(structure);
+
+    buildBar($("unitButtons"), unitsForProject(structure, selectedProject), onPickUnit, ()=>delUnit(), reorderUnits);
+
+    if (selectedMs){
+      selectedUnit = name;
+      setActive($("unitButtons"), name);
+      loadAndShowForm();
+    } else {
+      selectedUnit = null;
+      $("formPanel").style.display = "none";
+      $("unitPct").style.display = "none";
+    }
+  }
+
+  function deleteStoredDataForFilter(filterFn){
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++){
+      const k = localStorage.key(i);
+      if (k && k.startsWith(`${STORAGE_PREFIX}::`) && filterFn(k)) keys.push(k);
+    }
+    keys.forEach(k => localStorage.removeItem(k));
+  }
+
+  function delProject(){
+    if (!selectedProject){ alert("Select a Project first."); return; }
+    if (!confirmProceedIfDirty()) return;
+
+    const p = selectedProject;
+    confirmDelete(`Delete Project "${p}"?\n\nThis will remove the Project, its milestones, units, and ALL saved data under it.`, ()=>{
+      const structure = loadStructure();
+      structure.projects = structure.projects.filter(x => x !== p);
+      delete structure.milestonesByProject[p];
+      delete structure.unitsByProject[p];
+      saveStructure(structure);
+
+      deleteStoredDataForFilter((k) => k.includes(`::data::${p}::`) || k.includes(`::meta::${p}::`));
+
+      selectedProject = null; selectedMs = null; selectedUnit = null;
+      $("msPanel").style.display = "none";
+      $("unitPanel").style.display = "none";
+      $("formPanel").style.display = "none";
+      $("unitPct").style.display = "none";
+      markClean();
+      closeAddStagePanel();
+
+      buildBar($("projectButtons"), structure.projects, onPickProject, ()=>delProject(), reorderProjects);
+    });
+  }
+
+  function delMilestone(){
+    if (!selectedProject || !selectedMs){ alert("Select a Milestone first."); return; }
+    if (!confirmProceedIfDirty()) return;
+
+    const p = selectedProject, m = selectedMs;
+    confirmDelete(`Delete Milestone "${m}" under Project "${p}"?\n\nThis will delete ALL saved data for this milestone (all units).`, ()=>{
+      const structure = loadStructure();
+      structure.milestonesByProject[p] = (structure.milestonesByProject[p] || []).filter(x => x !== m);
+      saveStructure(structure);
+
+      deleteStoredDataForFilter((k) => k.includes(`::data::${p}::${m}::`) || k.includes(`::meta::${p}::${m}::`));
+
+      selectedMs = null; selectedUnit = null;
+      $("unitPanel").style.display = "none";
+      $("formPanel").style.display = "none";
+      $("unitPct").style.display = "none";
+      markClean();
+      closeAddStagePanel();
+
+      buildBar($("msButtons"), milestonesForProject(structure, p), onPickMilestone, ()=>delMilestone(), reorderMilestones);
+    });
+  }
+
+  function delUnit(){
+    if (!selectedProject || !selectedUnit){ alert("Select a Unit first."); return; }
+    if (!confirmProceedIfDirty()) return;
+
+    const p = selectedProject, u = selectedUnit;
+    confirmDelete(`Delete Unit "${u}" under Project "${p}"?\n\nThis removes the Unit from the project and deletes ALL saved data for this unit across ALL milestones.`, ()=>{
+      const structure = loadStructure();
+      structure.unitsByProject[p] = (structure.unitsByProject[p] || []).filter(x => x !== u);
+      saveStructure(structure);
+
+      deleteStoredDataForFilter((k) => (k.includes(`::data::${p}::`) && k.endsWith(`::${u}`)) || (k.includes(`::meta::${p}::`) && k.endsWith(`::${u}`)));
+
+      selectedUnit = null;
+      $("formPanel").style.display = "none";
+      $("unitPct").style.display = "none";
+      markClean();
+      closeAddStagePanel();
+
+      buildBar($("unitButtons"), unitsForProject(structure, p), onPickUnit, ()=>delUnit(), reorderUnits);
+    });
+  }
+
+  $("addProjectBtn").addEventListener("click", (e)=>{ e.preventDefault(); addProject(); });
+  $("addMilestoneBtn").addEventListener("click", (e)=>{ e.preventDefault(); addMilestone(); });
+  $("addUnitBtn").addEventListener("click", (e)=>{ e.preventDefault(); addUnit(); });
+
+  $("saveBtn").addEventListener("click", (e)=>{
+    e.preventDefault();
+    if (!selectedProject || !selectedMs || !selectedUnit) return;
+    const model = readModelFromUI();
+    saveModel(model);
+  });
+
+  $("resetBtn").addEventListener("click", (e)=>{
+    e.preventDefault();
+    if (!selectedProject || !selectedMs || !selectedUnit) return;
+    if (!confirm("Reset all fields for this Unit to default?\n\nClick Save afterward to keep the change.")) return;
+    const model = emptyModel();
+    renderTable(model);
+    markDirty();
+    updateUnitPercent();
+  });
+
+  // ----- Selection handlers -----
+  function onPickProject(p){
+    if (!confirmProceedIfDirty()) return;
+
+    const structure = loadStructure();
+    selectedProject = p;
+    setActive($("projectButtons"), p);
+
+    $("msPanel").style.display = "";
+    $("unitPanel").style.display = "none";
+    $("formPanel").style.display = "none";
+    $("unitPct").style.display = "none";
+
+    selectedMs = null; selectedUnit = null;
+    markClean();
+    closeAddStagePanel();
+
+    buildBar($("msButtons"), milestonesForProject(structure, selectedProject), onPickMilestone, ()=>delMilestone(), reorderMilestones);
+  }
+
+  function onPickMilestone(m){
+    if (!confirmProceedIfDirty()) return;
+
+    const structure = loadStructure();
+    selectedMs = m;
+    setActive($("msButtons"), m);
+
+    $("unitPanel").style.display = "";
+    $("formPanel").style.display = "none";
+    $("unitPct").style.display = "none";
+
+    selectedUnit = null;
+    markClean();
+    closeAddStagePanel();
+
+    buildBar($("unitButtons"), unitsForProject(structure, selectedProject), onPickUnit, ()=>delUnit(), reorderUnits);
+  }
+
+  function onPickUnit(u){
+    if (!confirmProceedIfDirty()) return;
+
+    selectedUnit = u;
+    setActive($("unitButtons"), u);
+    loadAndShowForm();
+  }
+
+  // ----- Admin: Export / Import (hidden unless ?admin=1) -----
+  function exportJson(){
+    const out = {};
+    for (let i = 0; i < localStorage.length; i++){
+      const k = localStorage.key(i);
+      if (k && k.startsWith(STORAGE_PREFIX + "::")) out[k] = localStorage.getItem(k);
+    }
+    const json = JSON.stringify(out, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "signoff-tracker-backup-" + new Date().toISOString().slice(0,10) + ".json";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+  function importJson(file){
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      try {
+        const data = JSON.parse(reader.result);
+        let count = 0;
+        for (const k of Object.keys(data)){
+          if (String(k).startsWith(STORAGE_PREFIX + "::")){
+            localStorage.setItem(k, data[k]);
+            count++;
+          }
+        }
+        alert("Imported " + count + " entries. Reloading.");
+        location.reload();
+      } catch (e){
+        alert("Invalid JSON or wrong format: " + e.message);
+      }
+    };
+    reader.readAsText(file);
+  }
+  if (new URLSearchParams(window.location.search).get("admin") === "1"){
+    document.body.classList.add("show-admin");
+    $("adminExportBtn").addEventListener("click", (e)=>{ e.preventDefault(); exportJson(); });
+    $("adminImportBtn").addEventListener("click", (e)=>{ e.preventDefault(); $("adminFileInput").click(); });
+    $("adminFileInput").addEventListener("change", (e)=>{
+      const f = e.target.files && e.target.files[0];
+      if (f) importJson(f);
+      e.target.value = "";
+    });
+  }
+
+  // ----- Init -----
+  (function init(){
+    const structure = loadStructure();
+    buildBar($("projectButtons"), structure.projects, onPickProject, ()=>delProject(), reorderProjects);
+  })();
+</script>
+</body>
+</html>
