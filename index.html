@@ -529,14 +529,14 @@
     return base;
   }
   function loadModel(p=selectedProject,m=selectedMs,u=selectedUnit){
-    const raw = localStorage.getItem(storageKeyData(p,m,u));
+    const raw = window.remote?.kvGet?.(storageKeyData(p,m,u)) ?? localStorage.getItem(storageKeyData(p,m,u));
     if (!raw) return emptyModel();
     try{ return normalizeModel(JSON.parse(raw)); }
     catch{ return emptyModel(); }
   }
 
   function loadMeta(p=selectedProject,m=selectedMs,u=selectedUnit){
-    const raw = localStorage.getItem(storageKeyMeta(p,m,u));
+    const raw = window.remote?.kvGet?.(storageKeyMeta(p,m,u)) ?? localStorage.getItem(storageKeyMeta(p,m,u));
     if (!raw) return { lastSavedAt: null };
     try{
       const mm = JSON.parse(raw);
@@ -544,7 +544,10 @@
     } catch { return { lastSavedAt: null }; }
   }
   function saveMeta(lastSavedAt,p=selectedProject,m=selectedMs,u=selectedUnit){
-    localStorage.setItem(storageKeyMeta(p,m,u), JSON.stringify({ lastSavedAt }));
+    const key = storageKeyMeta(p,m,u);
+    const val = JSON.stringify({ lastSavedAt });
+    if (window.remote?.kvSet){ window.remote.kvSet(key, val); window.remote?.saveSoon?.(); }
+    else localStorage.setItem(key, val);
   }
   function updateLastUpdateLabelFromMeta(){
     const meta = loadMeta();
@@ -553,11 +556,10 @@
       : "Last update: —";
   }
   function saveModel(model){
-    localStorage.setItem(storageKeyData(), JSON.stringify(model));
-    const ts = Date.now();
-    saveMeta(ts);
-    updateLastUpdateLabelFromMeta();
-    markClean();
+    const key = storageKeyData();
+    const val = JSON.stringify(model);
+    if (window.remote?.kvSet){ window.remote.kvSet(key, val); const ts = Date.now(); saveMeta(ts); updateLastUpdateLabelFromMeta(); markClean(); window.remote?.saveSoon?.(); }
+    else { localStorage.setItem(key, val); const ts = Date.now(); saveMeta(ts); updateLastUpdateLabelFromMeta(); markClean(); }
   }
 
   function markDirty(){
@@ -608,7 +610,7 @@
     return { projects: [...DEFAULT_PROJECTS], milestonesByProject, unitsByProject };
   }
   function loadStructure(){
-    const raw = localStorage.getItem(STORAGE_STRUCTURE);
+    const raw = window.remote?.kvGet?.(STORAGE_STRUCTURE) ?? localStorage.getItem(STORAGE_STRUCTURE);
     if (!raw) return defaultStructure();
     try{
       const s = JSON.parse(raw);
@@ -629,7 +631,11 @@
       return defaultStructure();
     }
   }
-  function saveStructure(structure){ localStorage.setItem(STORAGE_STRUCTURE, JSON.stringify(structure)); }
+  function saveStructure(structure){
+    const val = JSON.stringify(structure);
+    if (window.remote?.kvSet){ window.remote.kvSet(STORAGE_STRUCTURE, val); window.remote?.saveSoon?.(); }
+    else localStorage.setItem(STORAGE_STRUCTURE, val);
+  }
   function milestonesForProject(structure, project){ return structure.milestonesByProject[project] || []; }
   function unitsForProject(structure, project){ return structure.unitsByProject[project] || []; }
 
@@ -1109,12 +1115,18 @@
   }
 
   function deleteStoredDataForFilter(filterFn){
-    const keys = [];
-    for (let i = 0; i < localStorage.length; i++){
-      const k = localStorage.key(i);
-      if (k && k.startsWith(`${STORAGE_PREFIX}::`) && filterFn(k)) keys.push(k);
+    if (window.remote?.kvKeys){
+      const keys = (window.remote.kvKeys() ?? []).filter(k => k.startsWith(`${STORAGE_PREFIX}::`) && filterFn(k));
+      for (const k of keys) window.remote?.kvRemove?.(k);
+      window.remote?.saveSoon?.();
+    } else {
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i++){
+        const k = localStorage.key(i);
+        if (k && k.startsWith(`${STORAGE_PREFIX}::`) && filterFn(k)) keys.push(k);
+      }
+      keys.forEach(k => localStorage.removeItem(k));
     }
-    keys.forEach(k => localStorage.removeItem(k));
   }
 
   function delProject(){
@@ -1258,9 +1270,9 @@
   // ----- Admin: Export / Import (hidden unless ?admin=1) -----
   function exportJson(){
     const out = {};
-    for (let i = 0; i < localStorage.length; i++){
-      const k = localStorage.key(i);
-      if (k && k.startsWith(STORAGE_PREFIX + "::")) out[k] = localStorage.getItem(k);
+    const keys = window.remote?.kvKeys?.() ?? [];
+    for (const k of keys){
+      if (k && k.startsWith(STORAGE_PREFIX + "::")) out[k] = window.remote.kvGet(k);
     }
     const json = JSON.stringify(out, null, 2);
     const blob = new Blob([json], { type: "application/json" });
@@ -1278,12 +1290,14 @@
         let count = 0;
         for (const k of Object.keys(data)){
           if (String(k).startsWith(STORAGE_PREFIX + "::")){
-            localStorage.setItem(k, data[k]);
+            window.remote?.kvSet?.(k, data[k]);
             count++;
           }
         }
-        alert("Imported " + count + " entries. Reloading.");
-        location.reload();
+        window.remote?.saveNow?.().then(()=>{
+          alert("Imported " + count + " entries. Reloading.");
+          location.reload();
+        });
       } catch (e){
         alert("Invalid JSON or wrong format: " + e.message);
       }
@@ -1302,52 +1316,74 @@
   }
 
   // ----- Init -----
-  (function init(){
+  (async function init(){
+    for (let i = 0; i < 50 && !window.remote; i++) await new Promise(r => setTimeout(r, 50));
+    if (window.remote?.ready) await window.remote.ready;
     const structure = loadStructure();
     buildBar($("projectButtons"), structure.projects, onPickProject, ()=>delProject(), reorderProjects);
   })();
 </script>
-</body>
-</html>
-
-
-
-// added for github and firebase integration
 <script type="module">
-  // Import Firebase SDK from CDN
-  import { initializeApp } 
-    from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-  import { getFirestore, collection, addDoc, getDocs }
-    from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-  // Your Firebase configuration (paste YOUR values here)
+  // 🔧 Paste your exact config from Firebase → Project settings → Your apps (Web)
   const firebaseConfig = {
-  apiKey: "AIzaSyDNbYJ-YzYCsTPbLqq4L1MsMtZaBJD6pAU",
-  authDomain: "signoff-app.firebaseapp.com",
-  projectId: "signoff-app",
-  storageBucket: "signoff-app.firebasestorage.app",
-  messagingSenderId: "436328014747",
-  appId: "1:436328014747:web:6cb21f3474f8354754373e"
-};
-
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-
-  // Function to save data
-  window.saveResponse = async function (data) {
-    await addDoc(collection(db, "responses"), {
-      ...data,
-      createdAt: new Date().toISOString()
-    });
-    console.log("Saved:", data);
+    apiKey: "AIzaSyDNbYJ-YzYCsTPbLqq4L1MsMtZaBJD6pAU",
+    authDomain: "signoff-app.firebaseapp.com",
+    projectId: "signoff-app",
+    messagingSenderId: "436328014747",
+    appId: "1:436328014747:web:6cb21f3474f8354754373e"
   };
 
-  // Function to load all data
-  window.loadResponses = async function () {
-    const snap = await getDocs(collection(db, "responses"));
-    const results = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    console.log("Loaded:", results);
-    return results;
+  const app = initializeApp(firebaseConfig);
+  const db  = getFirestore(app);
+
+  const STATE_DOC = doc(db, "state", "config");
+  let REMOTE_KV = {};
+  let saveTimer = null;
+
+  async function remoteLoad(){
+    try {
+      const snap = await getDoc(STATE_DOC);
+      if (snap.exists()){
+        const data = snap.data();
+        const raw = (typeof data?.kv === "string") ? data.kv : "{}";
+        REMOTE_KV = JSON.parse(raw || "{}");
+      } else {
+        REMOTE_KV = {};
+        await setDoc(STATE_DOC, { kv: JSON.stringify(REMOTE_KV) });
+      }
+      console.log("[remote] loaded keys:", Object.keys(REMOTE_KV).length);
+    } catch (e) {
+      console.error("[remote] load failed", e);
+      REMOTE_KV = {};
+    }
+  }
+
+  async function remoteSave(){
+    const raw = JSON.stringify(REMOTE_KV);
+    await setDoc(STATE_DOC, { kv: raw }, { merge: true });
+    console.log("[remote] saved keys:", Object.keys(REMOTE_KV).length);
+  }
+
+  function saveSoon(ms=120){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(()=>remoteSave().catch(console.error), ms);
+  }
+
+  function kvGet(key){ return REMOTE_KV[key] ?? null; }
+  function kvSet(key, value){ REMOTE_KV[key] = value; }
+  function kvRemove(key){ delete REMOTE_KV[key]; }
+  function kvKeys(){ return Object.keys(REMOTE_KV); }
+
+  // Expose to your non-module script
+  window.remote = {
+    ready: (async ()=>{ await remoteLoad(); })(),
+    kvGet, kvSet, kvRemove, kvKeys,
+    saveSoon,
+    saveNow: remoteSave
   };
 </script>
+</body>
+</html>
