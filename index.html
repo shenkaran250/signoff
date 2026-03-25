@@ -333,6 +333,8 @@
     #adminBar .admin-btn{ padding: 6px 10px; border-radius: 6px; border: 1px solid #ccc; background: #fff; cursor: pointer; font-size: 12px; font-weight: 700; }
     #adminBar .admin-btn:hover{ background: #f0f0f0; }
     #adminBar input[type="file"]{ display: none; }
+    .adminOnly{ display: none !important; }
+    body.show-admin .adminOnly{ display: inline-flex !important; }
 
     .deleteConfirmOverlay{
       display: none;
@@ -399,7 +401,7 @@
   <div class="bar">
     <div class="barHeader">Project</div>
     <div class="barButtons" id="projectButtons"></div>
-    <button class="barIconBtn barAddBtn" id="addProjectBtn" type="button" aria-label="Add project">+</button>
+    <button class="barIconBtn barAddBtn adminOnly" id="addProjectBtn" type="button" aria-label="Add project">+</button>
   </div>
 </div>
 
@@ -407,7 +409,7 @@
   <div class="bar">
     <div class="barHeader">Milestone</div>
     <div class="barButtons" id="msButtons"></div>
-    <button class="barIconBtn barAddBtn" id="addMilestoneBtn" type="button" aria-label="Add milestone">+</button>
+    <button class="barIconBtn barAddBtn adminOnly" id="addMilestoneBtn" type="button" aria-label="Add milestone">+</button>
   </div>
 </div>
 
@@ -415,7 +417,7 @@
   <div class="bar">
     <div class="barHeader">Unit</div>
     <div class="barButtons" id="unitButtons"></div>
-    <button class="barIconBtn barAddBtn" id="addUnitBtn" type="button" aria-label="Add unit">+</button>
+    <button class="barIconBtn barAddBtn adminOnly" id="addUnitBtn" type="button" aria-label="Add unit">+</button>
   </div>
 </div>
 
@@ -488,6 +490,7 @@
 
   const $ = (id) => document.getElementById(id);
   $("now").textContent = new Date().toLocaleString();
+  const IS_ADMIN_MODE = (new URLSearchParams(window.location.search).get("admin") === "1");
 
   const STORAGE_PREFIX = "signoff-tracker-v14";
   const STORAGE_STRUCTURE = `${STORAGE_PREFIX}::structure`;
@@ -645,7 +648,7 @@
       const wrap = document.createElement("div");
       wrap.className = "bar-btn-wrap";
       wrap.dataset.name = name;
-      if (typeof onReorder === "function"){
+      if (IS_ADMIN_MODE && typeof onReorder === "function"){
         wrap.setAttribute("draggable", "true");
         wrap.setAttribute("aria-label", "Drag to reorder");
         wrap.addEventListener("dragstart", (e)=>{
@@ -686,7 +689,7 @@
       btn.textContent = name;
       btn.addEventListener("click", ()=>onPick(name));
       wrap.appendChild(btn);
-      if (typeof onDelete === "function"){
+      if (IS_ADMIN_MODE && typeof onDelete === "function"){
         const delBtn = document.createElement("button");
         delBtn.type = "button";
         delBtn.className = "barDelBtnOnPill";
@@ -1304,7 +1307,7 @@
     };
     reader.readAsText(file);
   }
-  if (new URLSearchParams(window.location.search).get("admin") === "1"){
+  if (IS_ADMIN_MODE){
     document.body.classList.add("show-admin");
     $("adminExportBtn").addEventListener("click", (e)=>{ e.preventDefault(); exportJson(); });
     $("adminImportBtn").addEventListener("click", (e)=>{ e.preventDefault(); $("adminFileInput").click(); });
