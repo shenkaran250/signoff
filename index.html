@@ -802,7 +802,9 @@
 
         const tdActions = document.createElement("td");
         tdActions.className = "rowActions";
-        tdActions.innerHTML = `<button class="stageDelBtn" type="button" data-action="del-row" data-stage="${escapeAttr(stage)}" data-row-index="${rowIndex}" aria-label="Remove row">−</button><button class="stageAddBtn" type="button" data-action="add-row" data-stage="${escapeAttr(stage)}" data-row-index="${rowIndex}" aria-label="Add row below">+</button>`;
+        tdActions.innerHTML = IS_ADMIN_MODE
+          ? `<button class="stageDelBtn" type="button" data-action="del-row" data-stage="${escapeAttr(stage)}" data-row-index="${rowIndex}" aria-label="Remove row">−</button><button class="stageAddBtn" type="button" data-action="add-row" data-stage="${escapeAttr(stage)}" data-row-index="${rowIndex}" aria-label="Add row below">+</button>`
+          : "";
 
         tr.append(tdStage, tdManager, tdOwner, tdDue, tdComments, tdStatus, tdActions);
         tbody.appendChild(tr);
@@ -822,41 +824,43 @@
       });
     });
 
-    tbody.querySelectorAll("button[data-action='del-row']").forEach(btn=>{
-      btn.addEventListener("click", () => {
-        const stage = btn.dataset.stage;
-        const rowIndex = parseInt(btn.dataset.rowIndex, 10);
-        if (stage == null || isNaN(rowIndex)) return;
+    if (IS_ADMIN_MODE){
+      tbody.querySelectorAll("button[data-action='del-row']").forEach(btn=>{
+        btn.addEventListener("click", () => {
+          const stage = btn.dataset.stage;
+          const rowIndex = parseInt(btn.dataset.rowIndex, 10);
+          if (stage == null || isNaN(rowIndex)) return;
 
-        const modelNow = readModelFromUI();
-        const arr = modelNow.rows[stage];
-        if (!Array.isArray(arr) || rowIndex < 0 || rowIndex >= arr.length) return;
-        arr.splice(rowIndex, 1);
-        if (arr.length === 0){
-          modelNow.stages = (modelNow.stages || []).filter(s => s !== stage);
-          delete modelNow.rows[stage];
-        }
-        renderTable(modelNow);
-        markDirty();
-        updateUnitPercent();
+          const modelNow = readModelFromUI();
+          const arr = modelNow.rows[stage];
+          if (!Array.isArray(arr) || rowIndex < 0 || rowIndex >= arr.length) return;
+          arr.splice(rowIndex, 1);
+          if (arr.length === 0){
+            modelNow.stages = (modelNow.stages || []).filter(s => s !== stage);
+            delete modelNow.rows[stage];
+          }
+          renderTable(modelNow);
+          markDirty();
+          updateUnitPercent();
+        });
       });
-    });
 
-    tbody.querySelectorAll("button[data-action='add-row']").forEach(btn=>{
-      btn.addEventListener("click", () => {
-        const stage = btn.dataset.stage;
-        const rowIndex = parseInt(btn.dataset.rowIndex, 10);
-        if (stage == null || isNaN(rowIndex)) return;
+      tbody.querySelectorAll("button[data-action='add-row']").forEach(btn=>{
+        btn.addEventListener("click", () => {
+          const stage = btn.dataset.stage;
+          const rowIndex = parseInt(btn.dataset.rowIndex, 10);
+          if (stage == null || isNaN(rowIndex)) return;
 
-        const modelNow = readModelFromUI();
-        if (!modelNow.rows[stage]) modelNow.rows[stage] = [ emptyRow() ];
-        const arr = modelNow.rows[stage];
-        arr.splice(rowIndex + 1, 0, emptyRow());
-        renderTable(modelNow);
-        markDirty();
-        updateUnitPercent();
+          const modelNow = readModelFromUI();
+          if (!modelNow.rows[stage]) modelNow.rows[stage] = [ emptyRow() ];
+          const arr = modelNow.rows[stage];
+          arr.splice(rowIndex + 1, 0, emptyRow());
+          renderTable(modelNow);
+          markDirty();
+          updateUnitPercent();
+        });
       });
-    });
+    }
   }
 
   function stagesFromTable(){
