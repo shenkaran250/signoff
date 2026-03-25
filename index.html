@@ -275,6 +275,88 @@
     .rowActions .stageAddBtn{ margin-left: 4px; }
     .rowActions .stageAddBtn:first-of-type{ margin-left: 0; }
 
+    /*
+     * TRIAL — flush grid signoff table (cells/rows meet with no gap).
+     * Revert: remove class signoffTable--trial from <table> and delete this whole block.
+     */
+    table.signoffTable--trial{
+      border: 1px solid var(--line);
+      border-radius: 0;
+    }
+    table.signoffTable--trial th,
+    table.signoffTable--trial td{
+      padding: 0;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      vertical-align: middle;
+      background: #fff;
+    }
+    table.signoffTable--trial th:last-child,
+    table.signoffTable--trial td:last-child{ border-right: none; }
+    table.signoffTable--trial thead th{
+      padding: 8px 10px;
+      background: #f3f4f6;
+      font-weight: 800;
+      color: #1f2937;
+      border-bottom: 1px solid #d1d5db;
+    }
+    table.signoffTable--trial tbody tr:last-child td{ border-bottom: none; }
+    table.signoffTable--trial tr.no-line-below td{ border-bottom: 1px solid var(--line); }
+    table.signoffTable--trial td.stagename{
+      padding: 8px 10px;
+      vertical-align: middle;
+    }
+    table.signoffTable--trial td.rowActions{
+      padding: 6px 8px;
+      text-align: center;
+      white-space: nowrap;
+    }
+    table.signoffTable--trial input[type="text"]{
+      border-radius: 0;
+      border: none;
+      border-bottom: 1px solid transparent;
+      padding: 10px 12px;
+      box-shadow: none;
+    }
+    table.signoffTable--trial input[type="text"]:focus{
+      outline: none;
+      border-bottom-color: var(--primary);
+      background: #fafbff;
+    }
+    table.signoffTable--trial textarea{
+      border-radius: 0;
+      border: none;
+      padding: 10px 12px;
+      min-height: 56px;
+      resize: vertical;
+      box-shadow: none;
+    }
+    table.signoffTable--trial textarea:focus{
+      outline: 2px solid var(--primary);
+      outline-offset: -2px;
+    }
+    table.signoffTable--trial select.status{
+      border-radius: 0;
+      border: none;
+      padding: 10px 12px;
+      box-shadow: none;
+    }
+    table.signoffTable--trial select.status:focus{
+      outline: 2px solid var(--primary);
+      outline-offset: -2px;
+    }
+    table.signoffTable--trial .dueGroup{
+      border-radius: 0;
+      border: none;
+    }
+    table.signoffTable--trial td:has(.dueGroup){
+      padding: 0;
+      vertical-align: stretch;
+    }
+    table.signoffTable--trial .dueGroup select{
+      padding: 10px 20px 10px 8px;
+    }
+
     .fab{
       position:absolute;
       right: 14px;
@@ -436,7 +518,8 @@
         </div>
       </div>
 
-      <table aria-label="Signoff table">
+      <!-- TRIAL layout: remove signoffTable--trial to restore spaced cell style -->
+      <table class="signoffTable--trial" aria-label="Signoff table">
         <thead>
           <tr>
             <th style="width:72px;">Stage</th>
