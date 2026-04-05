@@ -1381,6 +1381,31 @@
     loadAndShowForm();
   }
 
+  let remoteSyncTimer = null;
+  window.addEventListener("signoff-kv-changed", ()=>{
+    clearTimeout(remoteSyncTimer);
+    remoteSyncTimer = setTimeout(()=>{
+      if (!window.remote?.kvGet) return;
+      const structure = loadStructure();
+      buildBar($("projectButtons"), structure.projects, onPickProject, ()=>delProject(), reorderProjects);
+      if (selectedProject) setActive($("projectButtons"), selectedProject);
+      if ($("msPanel").style.display !== "none" && selectedProject){
+        buildBar($("msButtons"), milestonesForProject(structure, selectedProject), onPickMilestone, ()=>delMilestone(), reorderMilestones);
+        if (selectedMs) setActive($("msButtons"), selectedMs);
+      }
+      if ($("unitPanel").style.display !== "none" && selectedProject){
+        buildBar($("unitButtons"), unitsForProject(structure, selectedProject), onPickUnit, ()=>delUnit(), reorderUnits);
+        if (selectedUnit) setActive($("unitButtons"), selectedUnit);
+      }
+      if (selectedProject && selectedMs && selectedUnit && $("formPanel").style.display !== "none" && !isDirty){
+        const model = loadModel();
+        renderTable(model);
+        updateLastUpdateLabelFromMeta();
+        updateUnitPercent();
+      }
+    }, 280);
+  });
+
   // ----- Admin: Export / Import (hidden unless ?admin=1) -----
   function exportJson(){
     const out = {};
@@ -1439,7 +1464,10 @@
 </script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-  import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+  import {
+    getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
+    collection, getDocs, onSnapshot, writeBatch, deleteField
+  } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
   // 🔧 Paste your exact config from Firebase → Project settings → Your apps (Web)
   const firebaseConfig = {
@@ -1454,49 +1482,118 @@
   const db  = getFirestore(app);
 
   const STATE_DOC = doc(db, "state", "config");
+  const kvCol = () => collection(db, "state", "config", "kv");
+
+  function encodeKey(key){ return encodeURIComponent(key); }
+  function decodeKey(id){ return decodeURIComponent(id); }
+
   let REMOTE_KV = {};
   let saveTimer = null;
+  const pendingWrites = new Set();
+  const pendingDeletes = new Set();
+  let firstSnapshotDone = false;
 
-  async function remoteLoad(){
+  async function migrateLegacyKvBlob(){
     try {
       const snap = await getDoc(STATE_DOC);
-      if (snap.exists()){
-        const data = snap.data();
-        const raw = (typeof data?.kv === "string") ? data.kv : "{}";
-        REMOTE_KV = JSON.parse(raw || "{}");
-      } else {
-        REMOTE_KV = {};
-        await setDoc(STATE_DOC, { kv: JSON.stringify(REMOTE_KV) });
+      if (!snap.exists()) return;
+      const raw = snap.data()?.kv;
+      if (typeof raw !== "string" || !raw.trim()) return;
+      let parsed;
+      try { parsed = JSON.parse(raw); } catch { return; }
+      if (!parsed || typeof parsed !== "object") return;
+      const entries = Object.entries(parsed);
+      const col = kvCol();
+      for (let i = 0; i < entries.length; i += 400){
+        const batch = writeBatch(db);
+        for (const [k, v] of entries.slice(i, i + 400)){
+          batch.set(doc(col, encodeKey(k)), { v: typeof v === "string" ? v : String(v) });
+        }
+        await batch.commit();
       }
-      console.log("[remote] loaded keys:", Object.keys(REMOTE_KV).length);
-    } catch (e) {
-      console.error("[remote] load failed", e);
-      REMOTE_KV = {};
+      await updateDoc(STATE_DOC, { kv: deleteField() });
+      console.log("[remote] migrated legacy kv blob →", entries.length, "documents");
+    } catch (e){
+      console.error("[remote] legacy migration failed", e);
     }
   }
 
-  async function remoteSave(){
-    const raw = JSON.stringify(REMOTE_KV);
-    await setDoc(STATE_DOC, { kv: raw }, { merge: true });
-    console.log("[remote] saved keys:", Object.keys(REMOTE_KV).length);
+  async function remoteFlush(){
+    const col = kvCol();
+    const ops = [];
+    for (const k of pendingDeletes){
+      pendingWrites.delete(k);
+      ops.push(deleteDoc(doc(col, encodeKey(k))).catch((e)=> console.warn("[remote] delete", k, e)));
+    }
+    pendingDeletes.clear();
+    for (const k of pendingWrites){
+      const v = REMOTE_KV[k];
+      if (v !== undefined)
+        ops.push(setDoc(doc(col, encodeKey(k)), { v }, { merge: true }));
+    }
+    pendingWrites.clear();
+    if (ops.length) await Promise.all(ops);
   }
 
   function saveSoon(ms=120){
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(()=>remoteSave().catch(console.error), ms);
+    saveTimer = setTimeout(()=> remoteFlush().catch(console.error), ms);
   }
 
+  async function saveNow(){ clearTimeout(saveTimer); await remoteFlush(); }
+
   function kvGet(key){ return REMOTE_KV[key] ?? null; }
-  function kvSet(key, value){ REMOTE_KV[key] = value; }
-  function kvRemove(key){ delete REMOTE_KV[key]; }
+  function kvSet(key, value){
+    REMOTE_KV[key] = value;
+    pendingDeletes.delete(key);
+    pendingWrites.add(key);
+    saveSoon();
+  }
+  function kvRemove(key){
+    delete REMOTE_KV[key];
+    pendingWrites.delete(key);
+    pendingDeletes.add(key);
+    saveSoon();
+  }
   function kvKeys(){ return Object.keys(REMOTE_KV); }
 
-  // Expose to your non-module script
+  function dispatchKvChanged(){
+    window.dispatchEvent(new CustomEvent("signoff-kv-changed"));
+  }
+
+  const readyPromise = new Promise((resolve)=>{
+    migrateLegacyKvBlob().then(()=>{
+      const col = kvCol();
+      onSnapshot(col, (snap)=>{
+        if (!firstSnapshotDone){
+          REMOTE_KV = {};
+          snap.forEach((d)=>{ REMOTE_KV[decodeKey(d.id)] = d.data().v; });
+          firstSnapshotDone = true;
+          console.log("[remote] loaded keys:", Object.keys(REMOTE_KV).length);
+          dispatchKvChanged();
+          resolve();
+          return;
+        }
+        let touched = false;
+        snap.docChanges().forEach((ch)=>{
+          touched = true;
+          const k = decodeKey(ch.doc.id);
+          if (ch.type === "removed") delete REMOTE_KV[k];
+          else REMOTE_KV[k] = ch.doc.data().v;
+        });
+        if (touched) dispatchKvChanged();
+      }, (err)=>{
+        console.error("[remote] snapshot error", err);
+        if (!firstSnapshotDone){ firstSnapshotDone = true; resolve(); }
+      });
+    }).catch((e)=>{ console.error(e); resolve(); });
+  });
+
   window.remote = {
-    ready: (async ()=>{ await remoteLoad(); })(),
+    ready: readyPromise,
     kvGet, kvSet, kvRemove, kvKeys,
     saveSoon,
-    saveNow: remoteSave
+    saveNow
   };
 </script>
 </body>
