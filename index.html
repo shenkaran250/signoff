@@ -596,6 +596,17 @@
     for (const s of model.stages) model.rows[s] = [ emptyRow() ];
     return model;
   }
+  /** Same stages and row counts as `model`, every cell cleared to defaults. */
+  function modelWithBlankRows(model){
+    const stages = Array.isArray(model?.stages) ? [...model.stages] : [];
+    const rows = {};
+    for (const s of stages){
+      const arr = Array.isArray(model.rows?.[s]) ? model.rows[s] : [ emptyRow() ];
+      const n = Math.max(1, arr.length);
+      rows[s] = Array.from({ length: n }, () => emptyRow());
+    }
+    return { stages, rows };
+  }
   function normalizeModel(parsed){
     const base = emptyModel();
     const stages = Array.isArray(parsed?.stages) ? parsed.stages : DEFAULT_STAGES;
@@ -857,6 +868,13 @@
     if (status === "Done") return "done";
     if (status === "N/A") return "na";
     return "notdone";
+  }
+
+  function isFocusInUnitTableRubric(){
+    const ae = document.activeElement;
+    if (!ae || typeof ae.closest !== "function") return false;
+    if (!ae.matches("input, textarea, select")) return false;
+    return !!ae.closest("#tbody");
   }
 
   function renderTable(model){
@@ -1327,8 +1345,8 @@
   $("resetBtn").addEventListener("click", (e)=>{
     e.preventDefault();
     if (!selectedProject || !selectedMs || !selectedUnit) return;
-    if (!confirm("Reset all fields for this Unit to default?\n\nThis will save immediately.")) return;
-    const model = emptyModel();
+    if (!confirm("Clear all entries for this unit?\n\nStage names stay; rows become blank. Saves immediately.")) return;
+    const model = modelWithBlankRows(readModelFromUI());
     renderTable(model);
     markDirty();
     updateUnitPercent();
@@ -1398,8 +1416,10 @@
         if (selectedUnit) setActive($("unitButtons"), selectedUnit);
       }
       if (selectedProject && selectedMs && selectedUnit && $("formPanel").style.display !== "none" && !isDirty){
-        const model = loadModel();
-        renderTable(model);
+        if (!isFocusInUnitTableRubric()){
+          const model = loadModel();
+          renderTable(model);
+        }
         updateLastUpdateLabelFromMeta();
         updateUnitPercent();
       }
@@ -1529,7 +1549,12 @@
     for (const k of pendingWrites){
       const v = REMOTE_KV[k];
       if (v !== undefined)
-        ops.push(setDoc(doc(col, encodeKey(k)), { v }, { merge: true }));
+        ops.push(
+          setDoc(doc(col, encodeKey(k)), { v }, { merge: true }).catch((e)=>{
+            console.error("[remote] Firestore write failed (check Rules for state/config/kv):", k.slice(0, 80), e?.code || e);
+            throw e;
+          })
+        );
     }
     pendingWrites.clear();
     if (ops.length) await Promise.all(ops);
