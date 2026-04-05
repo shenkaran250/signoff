@@ -514,7 +514,7 @@
         </div>
         <div class="actionsLeft">
           <button class="ghost reset" id="resetBtn" type="button">Reset All</button>
-          <button class="primary" id="saveBtn" type="button">Save</button>
+          <button class="primary" id="saveBtn" type="button" hidden aria-hidden="true">Save</button>
         </div>
       </div>
 
@@ -535,7 +535,7 @@
       </table>
 
       <div class="muted hint">
-        *Don't forget to save changes before exiting this window.
+        Changes save automatically.
       </div>
 
       <div class="addPanel" id="addPanel" aria-label="Add stage panel">
@@ -648,15 +648,42 @@
     else { localStorage.setItem(key, val); const ts = Date.now(); saveMeta(ts); updateLastUpdateLabelFromMeta(); markClean(); }
   }
 
+  let autoSaveTimer = null;
+  const AUTO_SAVE_MS = 450;
+  function canAutoSaveUnit(){
+    return !!(selectedProject && selectedMs && selectedUnit && $("formPanel").style.display !== "none");
+  }
+  function flushAutoSave(){
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = null;
+    if (!canAutoSaveUnit() || !isDirty) return;
+    saveModel(readModelFromUI());
+  }
+  function scheduleAutoSave(){
+    if (!canAutoSaveUnit()) return;
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(()=>{
+      autoSaveTimer = null;
+      if (!canAutoSaveUnit() || !isDirty) return;
+      saveModel(readModelFromUI());
+    }, AUTO_SAVE_MS);
+  }
+
   function markDirty(){
     isDirty = true;
-    $("saveState").textContent = "Unsaved changes";
+    $("saveState").textContent = "Saving…";
+    scheduleAutoSave();
   }
-  function markClean(){ isDirty = false; }
+  function markClean(){
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = null;
+    isDirty = false;
+  }
 
   function confirmProceedIfDirty(){
+    flushAutoSave();
     if (!isDirty) return true;
-    return confirm("You have unsaved changes. Please click Save before leaving.\n\nContinue without saving?");
+    return confirm("Some changes may not have finished saving yet.\n\nContinue anyway?");
   }
   function confirmDelete(message, onConfirm){
     const overlay = $("deleteConfirmOverlay");
@@ -680,6 +707,7 @@
     overlay.addEventListener("click", handleOverlayClick);
   }
   window.addEventListener("beforeunload", (e) => {
+    flushAutoSave();
     if (!isDirty) return;
     e.preventDefault();
     e.returnValue = "";
@@ -1294,21 +1322,17 @@
   $("addMilestoneBtn").addEventListener("click", (e)=>{ e.preventDefault(); addMilestone(); });
   $("addUnitBtn").addEventListener("click", (e)=>{ e.preventDefault(); addUnit(); });
 
-  $("saveBtn").addEventListener("click", (e)=>{
-    e.preventDefault();
-    if (!selectedProject || !selectedMs || !selectedUnit) return;
-    const model = readModelFromUI();
-    saveModel(model);
-  });
+  $("saveBtn").addEventListener("click", (e)=>{ e.preventDefault(); flushAutoSave(); });
 
   $("resetBtn").addEventListener("click", (e)=>{
     e.preventDefault();
     if (!selectedProject || !selectedMs || !selectedUnit) return;
-    if (!confirm("Reset all fields for this Unit to default?\n\nClick Save afterward to keep the change.")) return;
+    if (!confirm("Reset all fields for this Unit to default?\n\nThis will save immediately.")) return;
     const model = emptyModel();
     renderTable(model);
     markDirty();
     updateUnitPercent();
+    flushAutoSave();
   });
 
   // ----- Selection handlers -----
