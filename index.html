@@ -917,7 +917,7 @@
     const lastIdx = current - 1;
     const lastHeader = theadEl.querySelector(`input[data-extra-header="${lastIdx}"]`);
     if (lastHeader && lastHeader.value.trim()){ addExtraColumnToDOM(current); return; }
-    const lastCells = $("tbody").querySelectorAll(`input[data-field="extraCol.${lastIdx}"]`);
+    const lastCells = $("tbody").querySelectorAll(`textarea[data-field="extraCol.${lastIdx}"]`);
     for (const cell of lastCells){ if (cell.value.trim()){ addExtraColumnToDOM(current); return; } }
   }
 
@@ -933,9 +933,9 @@
     $("tbody").querySelectorAll("tr[data-stage]").forEach(tr => {
       const actionsTd = tr.lastElementChild;
       const newTd = document.createElement("td");
-      newTd.innerHTML = `<input type="text" data-stage="${escapeAttr(tr.dataset.stage)}" data-row-index="${tr.dataset.rowIndex}" data-field="extraCol.${colIndex}" value="" />`;
+      newTd.innerHTML = `<textarea data-stage="${escapeAttr(tr.dataset.stage)}" data-row-index="${tr.dataset.rowIndex}" data-field="extraCol.${colIndex}"></textarea>`;
       tr.insertBefore(newTd, actionsTd);
-      const inp = newTd.querySelector("input");
+      const inp = newTd.querySelector("textarea");
       inp.addEventListener("input", () => { markDirty(); updateUnitPercentDebounced(); checkExtraColumns(); });
       inp.addEventListener("change", () => { markDirty(); });
     });
@@ -1012,7 +1012,7 @@
         const extraTds = [];
         for (let c = 0; c < extraColCount; c++){
           const tdExtra = document.createElement("td");
-          tdExtra.innerHTML = `<input type="text" data-stage="${escapeAttr(stage)}" data-row-index="${rowIndex}" data-field="extraCol.${c}" value="${escapeAttr((row.extraCols && row.extraCols[c]) || "")}" />`;
+          tdExtra.innerHTML = `<textarea data-stage="${escapeAttr(stage)}" data-row-index="${rowIndex}" data-field="extraCol.${c}">${escapeText((row.extraCols && row.extraCols[c]) || "")}</textarea>`;
           extraTds.push(tdExtra);
         }
         tr.append(tdStage, tdManager, tdOwner, tdDue, tdComments, tdStatus, ...extraTds, tdActions);
@@ -1037,7 +1037,7 @@
       el.addEventListener("input", () => { markDirty(); checkExtraColumns(); });
       el.addEventListener("change", () => { markDirty(); });
     });
-    tbody.querySelectorAll("input[data-field^=\"extraCol.\"]").forEach(el=>{
+    tbody.querySelectorAll("textarea[data-field^=\"extraCol.\"]").forEach(el=>{
       el.addEventListener("input", checkExtraColumns);
     });
 
