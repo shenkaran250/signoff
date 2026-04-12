@@ -161,8 +161,8 @@
     th,td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top;}
     tr.no-line-below td{border-bottom:none;}
     th{text-align:left;font-size:12px;color:#333;}
-    th.col-manager-owner{ width: 122px; }
-    td.stagename{font-weight:700;width:72px;white-space:nowrap;}
+    th.col-manager-owner{ min-width: 122px; width: 122px; }
+    td.stagename{font-weight:700;min-width:72px;width:72px;white-space:nowrap;}
 
     input[type="text"], textarea, select{
       width:100%;box-sizing:border-box;font:inherit;border:1px solid #d6d6d6;border-radius:10px;padding:8px 10px;background:#fff;
@@ -531,13 +531,13 @@
       <table class="signoffTable--trial" aria-label="Signoff table">
         <thead id="thead">
           <tr>
-            <th style="width:72px;">Stage</th>
-            <th class="col-manager-owner">Manager</th>
-            <th class="col-manager-owner">Owner</th>
-            <th style="width:150px;">Due Date</th>
-            <th>Comments</th>
-            <th class="statusCell" style="width:116px;">Status</th>
-            <th style="width:36px;"></th>
+            <th style="min-width:72px;width:72px;">Stage</th>
+            <th style="min-width:122px;width:122px;">Manager</th>
+            <th style="min-width:122px;width:122px;">Owner</th>
+            <th style="min-width:150px;width:150px;">Due Date</th>
+            <th style="min-width:200px;">Comments</th>
+            <th class="statusCell" style="min-width:116px;width:116px;">Status</th>
+            <th style="min-width:36px;width:36px;"></th>
           </tr>
         </thead>
         <tbody id="tbody"></tbody>
@@ -948,11 +948,11 @@
 
     const extraColCount = getExtraColCount(model);
     const extraHeaders = model.extraColHeaders || [];
-    let headHtml = '<tr><th style="width:72px;">Stage</th><th class="col-manager-owner">Manager</th><th class="col-manager-owner">Owner</th><th style="width:150px;">Due Date</th><th>Comments</th><th class="statusCell" style="width:116px;">Status</th>';
+    let headHtml = '<tr><th style="min-width:72px;width:72px;">Stage</th><th style="min-width:122px;width:122px;">Manager</th><th style="min-width:122px;width:122px;">Owner</th><th style="min-width:150px;width:150px;">Due Date</th><th style="min-width:200px;">Comments</th><th class="statusCell" style="min-width:116px;width:116px;">Status</th>';
     for (let c = 0; c < extraColCount; c++){
       headHtml += `<th style="min-width:140px;"><input type="text" class="extraColHeader" data-extra-header="${c}" value="${escapeAttr(extraHeaders[c] || "")}" placeholder="Column ${c + 1}" /></th>`;
     }
-    headHtml += '<th style="width:36px;"></th></tr>';
+    headHtml += '<th style="min-width:36px;width:36px;"></th></tr>';
     thead.innerHTML = headHtml;
 
     for (const stage of model.stages){
