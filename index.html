@@ -149,7 +149,15 @@
     .cardWrap{width:min(1127px,100%);}
     .card{border:1px solid var(--line);border-radius:12px;background:#fff;padding:12px; position:relative;}
 
-    table{width:100%;border-collapse:collapse;margin-top:10px;}
+    .tableScrollWrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:10px;}
+    table{min-width:100%;border-collapse:collapse;}
+    input.extraColHeader{
+      font-weight:800 !important;font-size:12px !important;color:#1f2937;
+      background:transparent !important;border:none !important;padding:0 !important;
+      width:100%;box-sizing:border-box;border-radius:0 !important;box-shadow:none !important;
+    }
+    input.extraColHeader:focus{outline:none;background:#eef2ff !important;}
+    input.extraColHeader::placeholder{color:#9ca3af;font-weight:600;}
     th,td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top;}
     tr.no-line-below td{border-bottom:none;}
     th{text-align:left;font-size:12px;color:#333;}
@@ -519,8 +527,9 @@
       </div>
 
       <!-- TRIAL layout: remove signoffTable--trial to restore spaced cell style -->
+      <div class="tableScrollWrap">
       <table class="signoffTable--trial" aria-label="Signoff table">
-        <thead>
+        <thead id="thead">
           <tr>
             <th style="width:72px;">Stage</th>
             <th class="col-manager-owner">Manager</th>
@@ -533,6 +542,7 @@
         </thead>
         <tbody id="tbody"></tbody>
       </table>
+      </div>
 
       <div class="muted hint">
         Changes save automatically.
@@ -581,18 +591,19 @@
   function storageKeyData(p=selectedProject,m=selectedMs,u=selectedUnit){ return `${STORAGE_PREFIX}::data::${p}::${m}::${u}`; }
   function storageKeyMeta(p=selectedProject,m=selectedMs,u=selectedUnit){ return `${STORAGE_PREFIX}::meta::${p}::${m}::${u}`; }
 
-  function emptyRow(){ return { manager:"", owner:"", due:{day:"",month:"",year:""}, status:"Not Done", comments:"" }; }
+  function emptyRow(){ return { manager:"", owner:"", due:{day:"",month:"",year:""}, status:"Not Done", comments:"", extraCols:[] }; }
   function normalizeRow(r){
     return {
       manager: r.manager ?? "",
       owner: r.owner ?? "",
       due: { day: r.due?.day ?? "", month: r.due?.month ?? "", year: r.due?.year ?? "" },
       status: r.status ?? "Not Done",
-      comments: r.comments ?? ""
+      comments: r.comments ?? "",
+      extraCols: Array.isArray(r.extraCols) ? [...r.extraCols] : []
     };
   }
   function emptyModel(){
-    const model = { stages: [...DEFAULT_STAGES], rows: {} };
+    const model = { stages: [...DEFAULT_STAGES], rows: {}, extraColHeaders: [] };
     for (const s of model.stages) model.rows[s] = [ emptyRow() ];
     return model;
   }
@@ -605,12 +616,13 @@
       const n = Math.max(1, arr.length);
       rows[s] = Array.from({ length: n }, () => emptyRow());
     }
-    return { stages, rows };
+    return { stages, rows, extraColHeaders: [] };
   }
   function normalizeModel(parsed){
     const base = emptyModel();
     const stages = Array.isArray(parsed?.stages) ? parsed.stages : DEFAULT_STAGES;
     base.stages = [...new Set(stages.map(s => String(s).trim()).filter(Boolean))];
+    base.extraColHeaders = Array.isArray(parsed?.extraColHeaders) ? [...parsed.extraColHeaders] : [];
     base.rows = {};
     for (const s of base.stages){
       const raw = parsed?.rows?.[s];
@@ -874,12 +886,74 @@
     const ae = document.activeElement;
     if (!ae || typeof ae.closest !== "function") return false;
     if (!ae.matches("input, textarea, select")) return false;
-    return !!ae.closest("#tbody");
+    return !!ae.closest("#tbody") || !!ae.closest("#thead");
+  }
+
+  function getExtraColCount(model){
+    let maxUsed = 0;
+    if (Array.isArray(model.extraColHeaders)){
+      for (let i = model.extraColHeaders.length - 1; i >= 0; i--){
+        if ((model.extraColHeaders[i] || "").trim()){ maxUsed = i + 1; break; }
+      }
+    }
+    for (const s of (model.stages || [])){
+      const arr = model.rows?.[s];
+      if (!Array.isArray(arr)) continue;
+      for (const row of arr){
+        if (!Array.isArray(row.extraCols)) continue;
+        for (let i = row.extraCols.length - 1; i >= 0; i--){
+          if ((row.extraCols[i] || "").trim()){ maxUsed = Math.max(maxUsed, i + 1); break; }
+        }
+      }
+    }
+    return maxUsed + 1;
+  }
+
+  function checkExtraColumns(){
+    const theadEl = $("thead");
+    const headerInputs = theadEl.querySelectorAll("input[data-extra-header]");
+    const current = headerInputs.length;
+    if (current === 0) return;
+    const lastIdx = current - 1;
+    const lastHeader = theadEl.querySelector(`input[data-extra-header="${lastIdx}"]`);
+    if (lastHeader && lastHeader.value.trim()){ addExtraColumnToDOM(current); return; }
+    const lastCells = $("tbody").querySelectorAll(`input[data-field="extraCol.${lastIdx}"]`);
+    for (const cell of lastCells){ if (cell.value.trim()){ addExtraColumnToDOM(current); return; } }
+  }
+
+  function addExtraColumnToDOM(colIndex){
+    const headTr = $("thead").querySelector("tr");
+    const actionsTh = headTr.lastElementChild;
+    const newTh = document.createElement("th");
+    newTh.style.minWidth = "140px";
+    newTh.innerHTML = `<input type="text" class="extraColHeader" data-extra-header="${colIndex}" value="" placeholder="Column ${colIndex + 1}" />`;
+    headTr.insertBefore(newTh, actionsTh);
+    newTh.querySelector("input").addEventListener("input", () => { markDirty(); checkExtraColumns(); });
+    newTh.querySelector("input").addEventListener("change", () => { markDirty(); });
+    $("tbody").querySelectorAll("tr[data-stage]").forEach(tr => {
+      const actionsTd = tr.lastElementChild;
+      const newTd = document.createElement("td");
+      newTd.innerHTML = `<input type="text" data-stage="${escapeAttr(tr.dataset.stage)}" data-row-index="${tr.dataset.rowIndex}" data-field="extraCol.${colIndex}" value="" />`;
+      tr.insertBefore(newTd, actionsTd);
+      const inp = newTd.querySelector("input");
+      inp.addEventListener("input", () => { markDirty(); updateUnitPercentDebounced(); checkExtraColumns(); });
+      inp.addEventListener("change", () => { markDirty(); });
+    });
   }
 
   function renderTable(model){
     const tbody = $("tbody");
+    const thead = $("thead");
     tbody.innerHTML = "";
+
+    const extraColCount = getExtraColCount(model);
+    const extraHeaders = model.extraColHeaders || [];
+    let headHtml = '<tr><th style="width:72px;">Stage</th><th class="col-manager-owner">Manager</th><th class="col-manager-owner">Owner</th><th style="width:150px;">Due Date</th><th>Comments</th><th class="statusCell" style="width:116px;">Status</th>';
+    for (let c = 0; c < extraColCount; c++){
+      headHtml += `<th style="min-width:140px;"><input type="text" class="extraColHeader" data-extra-header="${c}" value="${escapeAttr(extraHeaders[c] || "")}" placeholder="Column ${c + 1}" /></th>`;
+    }
+    headHtml += '<th style="width:36px;"></th></tr>';
+    thead.innerHTML = headHtml;
 
     for (const stage of model.stages){
       const stageRows = Array.isArray(model.rows[stage]) ? model.rows[stage] : [ emptyRow() ];
@@ -935,7 +1009,13 @@
           ? `<button class="stageDelBtn" type="button" data-action="del-row" data-stage="${escapeAttr(stage)}" data-row-index="${rowIndex}" aria-label="Remove row">−</button><button class="stageAddBtn" type="button" data-action="add-row" data-stage="${escapeAttr(stage)}" data-row-index="${rowIndex}" aria-label="Add row below">+</button>`
           : "";
 
-        tr.append(tdStage, tdManager, tdOwner, tdDue, tdComments, tdStatus, tdActions);
+        const extraTds = [];
+        for (let c = 0; c < extraColCount; c++){
+          const tdExtra = document.createElement("td");
+          tdExtra.innerHTML = `<input type="text" data-stage="${escapeAttr(stage)}" data-row-index="${rowIndex}" data-field="extraCol.${c}" value="${escapeAttr((row.extraCols && row.extraCols[c]) || "")}" />`;
+          extraTds.push(tdExtra);
+        }
+        tr.append(tdStage, tdManager, tdOwner, tdDue, tdComments, tdStatus, ...extraTds, tdActions);
         tbody.appendChild(tr);
       }
     }
@@ -951,6 +1031,14 @@
         }
         updateUnitPercentDebounced();
       });
+    });
+
+    thead.querySelectorAll("input[data-extra-header]").forEach(el=>{
+      el.addEventListener("input", () => { markDirty(); checkExtraColumns(); });
+      el.addEventListener("change", () => { markDirty(); });
+    });
+    tbody.querySelectorAll("input[data-field^=\"extraCol.\"]").forEach(el=>{
+      el.addEventListener("input", checkExtraColumns);
     });
 
     if (IS_ADMIN_MODE){
@@ -1003,7 +1091,14 @@
   }
 
   function readModelFromUI(){
-    const model = { stages: [], rows: {} };
+    const model = { stages: [], rows: {}, extraColHeaders: [] };
+    $("thead").querySelectorAll("input[data-extra-header]").forEach(el=>{
+      const idx = parseInt(el.dataset.extraHeader, 10);
+      if (!isNaN(idx)){
+        while (model.extraColHeaders.length <= idx) model.extraColHeaders.push("");
+        model.extraColHeaders[idx] = el.value;
+      }
+    });
     const tbody = $("tbody");
     const trs = tbody.querySelectorAll("tr[data-stage]");
     trs.forEach(tr=>{
@@ -1022,6 +1117,13 @@
         else if (field === "due.day") rowData.due.day = val;
         else if (field === "due.month") rowData.due.month = val;
         else if (field === "due.year") rowData.due.year = val;
+        else if (field.startsWith("extraCol.")){
+          const idx = parseInt(field.split(".")[1], 10);
+          if (!isNaN(idx)){
+            while (rowData.extraCols.length <= idx) rowData.extraCols.push("");
+            rowData.extraCols[idx] = val;
+          }
+        }
       });
       model.rows[stage].push(rowData);
     });
